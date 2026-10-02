@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Board</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'], },
+                    colors: {
+                        darkBg: '#0d1117', cardBg: '#161a22', borderColor: '#30363d',
+                        textPrimary: '#c9d1d9', textMuted: '#8b949e', accentOrange: '#db6d28',
+                        accentRed: '#f85149', accentGreen: '#2ea043', accentTeal: '#2dd4bf', accentBlue: '#58a6ff'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #0d1117; color: #c9d1d9; }
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        .nav-item.active { background-color: #21262d; color: #ffffff; font-weight: 600; }
+    </style>
+</head>
+<body class="h-screen w-full flex overflow-hidden font-sans">
+
+    <!-- Sidebar -->
+    <aside class="w-64 h-full bg-cardBg border-r border-borderColor flex flex-col justify-between flex-shrink-0 transition-transform duration-300 z-20 absolute md:relative transform -translate-x-full md:translate-x-0" id="sidebar">
+        <div>
+            <!-- Logo -->
+            <div class="p-6 flex items-center space-x-3">
+                <div class="text-accentOrange text-2xl"><i class="fa-solid fa-box-open"></i></div>
+                <div>
+                    <h1 class="text-white font-bold text-xl tracking-tight">Stock Board</h1>
+                    <p class="text-textMuted text-xs">One device, every part</p>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="mt-4 px-3 space-y-1">
+                <button onclick="switchView('dashboard')" id="nav-dashboard" class="nav-item active w-full flex items-center space-x-3 px-3 py-2 rounded-md hover:bg-[#21262d] transition-colors text-textMuted">
+                    <i class="fa-solid fa-table-cells-large w-5 text-center"></i>
+                    <span>Dashboard</span>
+                </button>
+                
+                <!-- Production Details Tab -->
+                <button onclick="switchView('production')" id="nav-production" class="nav-item w-full flex items-center space-x-3 px-3 py-2 rounded-md hover:bg-[#21262d] transition-colors text-textMuted">
+                    <i class="fa-solid fa-industry w-5 text-center"></i>
+                    <span>Production Details</span>
+                </button>
+
+                <button onclick="switchView('components')" id="nav-components" class="nav-item w-full flex items-center space-x-3 px-3 py-2 rounded-md hover:bg-[#21262d] transition-colors text-textMuted">
+                    <i class="fa-solid fa-cube w-5 text-center"></i>
+                    <span>Components</span>
+                </button>
+                <button onclick="switchView('orders')" id="nav-orders" class="nav-item w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-[#21262d] transition-colors text-textMuted">
+                    <div class="flex items-center space-x-3">
+                        <i class="fa-solid fa-truck w-5 text-center"></i>
+                        <span>Orders</span>
+                    </div>
+                    <span class="bg-accentBlue text-white text-[10px] font-bold px-2 py-0.5 rounded-full" id="nav-active-orders-badge">0</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- Auth Section -->
+        <div class="p-4 border-t border-borderColor">
+            <button id="auth-btn" onclick="toggleAuth()" class="w-full py-2 px-4 bg-transparent border border-borderColor rounded-md text-sm hover:bg-[#21262d] transition-colors flex items-center justify-center space-x-2">
+                <i class="fa-solid fa-user-lock" id="auth-icon"></i>
+                <span id="auth-btn-text">Log In</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 h-full flex flex-col relative overflow-hidden">
+        <!-- Mobile Header -->
+        <header class="md:hidden flex items-center justify-between p-4 bg-cardBg border-b border-borderColor">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-box-open text-accentOrange"></i>
+                <span class="font-bold text-white">Stock Board</span>
+            </div>
+            <button onclick="toggleMobileSidebar()" class="text-textMuted hover:text-white">
+                <i class="fa-solid fa-bars text-xl"></i>
+            </button>
+        </header>
+
+        <div class="flex-1 overflow-y-auto p-4 md:p-8 hide-scroll" id="main-scroll-area">
+            
+            <!-- View: Dashboard -->
+            <div id="view-dashboard" class="max-w-6xl mx-auto space-y-8 block">
+                <header>
+                    <h2 class="text-3xl font-bold text-white tracking-tight">Dashboard</h2>
+                    <p class="text-textMuted mt-1">Live status of every part in the device.</p>
+                </header>
+
+                <!-- Timeline / Alert Card -->
+                <div class="bg-cardBg border border-borderColor rounded-xl p-6 md:p-8 shadow-sm">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-8">
+                        <div>
+                            <div class="text-5xl md:text-6xl font-bold text-accentGreen" id="dash-urgent-count">0</div>
+                            <p class="text-textPrimary mt-2 text-lg">components need to be ordered immediately.</p>
+                        </div>
+                        <div class="mt-4 md:mt-0 text-right">
+                            <p class="text-textMuted text-sm">Order today, longest part lands</p>
+                            <p class="text-2xl font-bold text-white mt-1" id="dash-longest-land">-</p>
+                        </div>
+                    </div>
+
+                    <!-- Timeline Bar -->
+                    <div class="relative w-full mt-4">
+                        <div class="h-1.5 w-full bg-[#30363d] rounded-full overflow-hidden">
+                            <div class="h-full bg-accentOrange rounded-full w-full" id="timeline-progress" style="width: 0%;"></div>
+                        </div>
+                        <div class="flex justify-between mt-2 text-xs text-textMuted font-medium">
+                            <span id="timeline-today">Today</span>
+                            <span>+15 days</span>
+                            <span>+30 days</span>
+                            <span>+45 days</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-cardBg border border-borderColor rounded-xl p-5 shadow-sm">
+                        <div class="text-2xl font-bold text-white mb-1" id="stat-total">0</div>
+                        <div class="text-sm text-textMuted font-medium">Components tracked</div>
+                    </div>
+                    <div class="bg-cardBg border border-borderColor rounded-xl p-5 shadow-sm">
+                        <div class="text-2xl font-bold text-accentRed mb-1" id="stat-order-now">0</div>
+                        <div class="text-sm text-textMuted font-medium">Critically Low</div>
+                    </div>
+                    <div class="bg-cardBg border border-borderColor rounded-xl p-5 shadow-sm">
+                        <div class="text-2xl font-bold text-accentOrange mb-1" id="stat-getting-low">0</div>
+                        <div class="text-sm text-textMuted font-medium">Getting Low</div>
+                    </div>
+                    <div class="bg-cardBg border border-borderColor rounded-xl p-5 shadow-sm">
+                        <div class="text-2xl font-bold text-accentTeal mb-1" id="stat-stocked">0</div>
+                        <div class="text-sm text-textMuted font-medium">In Stock</div>
+                    </div>
+                </div>
+
+                <!-- Needs Order Section -->
+                <div>
+                    <h3 class="text-lg font-bold text-white mb-4">Stock Alerts</h3>
+                    <div class="bg-cardBg border border-borderColor rounded-xl overflow-hidden shadow-sm" id="needs-order-container">
+                        <div class="p-6 text-center text-textMuted" id="needs-order-empty">
+                            No immediate stock warnings right now.
+                        </div>
+                        <div class="hidden divide-y divide-borderColor" id="needs-order-list">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Production Details -->
+            <div id="view-production" class="max-w-6xl mx-auto space-y-6 hidden">
+                <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
+                    <div>
+                        <h2 class="text-3xl font-bold text-white tracking-tight">Production Details</h2>
+                        <p class="text-textMuted mt-1">Calculate component requirements based on company orders.</p>
+                    </div>
+                </header>
+
+                <!-- Search / Input Bar -->
+                <div class="w-full relative">
+                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <i class="fa-solid fa-industry text-accentBlue"></i>
+                    </div>
+                    <input type="number" id="production-target" min="0" oninput="renderProductionTable()" placeholder="Enter the number of orders received..." class="w-full bg-cardBg border border-borderColor rounded-xl pl-12 pr-4 py-4 text-lg text-white focus:outline-none focus:border-accentBlue shadow-sm placeholder-textMuted">
+                </div>
+
+                <!-- Production Table -->
+                <div class="bg-cardBg border border-borderColor rounded-xl overflow-x-auto shadow-sm">
+                    <table class="w-full text-left text-sm whitespace-nowrap">
+                        <thead class="bg-[#1f242d] text-textMuted border-b border-borderColor">
+                            <tr>
+                                <th class="px-6 py-4 font-semibold">Component Name</th>
+                                <th class="px-6 py-4 font-semibold text-right">Current Stock</th>
+                                <th class="px-6 py-4 font-semibold text-right">Required Quantity</th>
+                                <th class="px-6 py-4 font-semibold text-right">Min Order Qty</th>
+                                <th class="px-6 py-4 font-semibold text-right">Cost (₹)</th>
+                                <th class="px-6 py-4 font-semibold text-right">Total Cost (₹)</th>
+                                <th class="px-6 py-4 font-semibold text-right">Expected Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="production-table-body" class="divide-y divide-borderColor">
+                            <!-- Populated by JS -->
+                            <tr><td colspan="7" class="px-6 py-8 text-center text-textMuted">Enter the number of orders above to calculate requirements.</td></tr>
+                        </tbody>
+                        <tfoot id="production-table-foot" class="hidden">
+                            <!-- Populated by JS for Grand Total -->
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <!-- View: Components -->
+            <div id="view-components" class="max-w-6xl mx-auto space-y-6 hidden">
+                <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
+                    <div>
+                        <h2 class="text-3xl font-bold text-white tracking-tight">Components</h2>
+                        <p class="text-textMuted mt-1">Manage inventory items and parameters.</p>
+                    </div>
+                    <button onclick="openComponentModal()" class="admin-only hidden bg-accentOrange hover:bg-[#c2591e] text-white px-4 py-2 rounded-md font-medium transition-colors flex items-center space-x-2 shadow-sm">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Add Component</span>
+                    </button>
+                </header>
+
+                <!-- Search Bar -->
+                <div class="w-full relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fa-solid fa-magnifying-glass text-textMuted"></i>
+                    </div>
+                    <input type="text" id="search-input" oninput="renderComponentsTable()" placeholder="Search by component name or department..." class="w-full bg-cardBg border border-borderColor rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-accentBlue shadow-sm placeholder-textMuted">
+                </div>
+
+                <!-- Tables Container -->
+                <div id="components-tables-container" class="space-y-8">
+                    <!-- Dynamic tables grouped by department injected here -->
+                </div>
+            </div>
+
+            <!-- View: Orders -->
+            <div id="view-orders" class="max-w-6xl mx-auto space-y-6 hidden">
+                <header>
+                    <h2 class="text-3xl font-bold text-white tracking-tight">Active Orders</h2>
+                    <p class="text-textMuted mt-1">Track expected deliveries and update stock upon arrival.</p>
+                </header>
+                
+                <div id="orders-table-container" class="bg-cardBg border border-borderColor rounded-xl overflow-x-auto shadow-sm">
+                    <table class="w-full text-left text-sm whitespace-nowrap">
+                        <thead class="bg-[#1f242d] text-textMuted border-b border-borderColor">
+                            <tr>
+                                <th class="px-6 py-4 font-semibold">Component</th>
+                                <th class="px-6 py-4 font-semibold">Order Qty</th>
+                                <th class="px-6 py-4 font-semibold">Order Date</th>
+                                <th class="px-6 py-4 font-semibold">Expected Delivery</th>
+                                <th class="px-6 py-4 font-semibold text-center admin-only hidden">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orders-table-body" class="divide-y divide-borderColor">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Overlay for mobile sidebar -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-10 hidden md:hidden" onclick="toggleMobileSidebar()"></div>
+
+    <!-- Login Modal -->
+    <div id="modal-login" class="fixed inset-0 bg-black bg-opacity-70 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-borderColor rounded-xl p-6 w-full max-w-sm shadow-2xl relative">
+            <button onclick="closeModals()" class="absolute top-4 right-4 text-textMuted hover:text-white">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+            <h3 class="text-xl font-bold text-white mb-2">Admin Login</h3>
+            <p class="text-textMuted text-sm mb-6">Sign in to edit inventory data.</p>
+            
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-textPrimary mb-1">User ID</label>
+                    <input type="text" id="login-id" class="w-full bg-darkBg border border-borderColor rounded-md px-3 py-2 text-white focus:outline-none focus:border-accentOrange" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-textPrimary mb-1">Password</label>
+                    <input type="password" id="login-password" class="w-full bg-darkBg border border-borderColor rounded-md px-3 py-2 text-white focus:outline-none focus:border-accentOrange" required>
+                </div>
+                <div id="login-error" class="text-accentRed text-sm hidden font-medium">Invalid User ID or Password.</div>
+                <button type="submit" class="w-full bg-accentOrange hover:bg-[#c2591e] text-white py-2 rounded-md font-medium transition-colors mt-2">Log In</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Component Modal (Add/Edit) -->
+    <div id="modal-component" class="fixed inset-0 bg-black bg-opacity-70 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-borderColor rounded-xl p-6 w-full max-w-md shadow-2xl relative max-h-[90vh] overflow-y-auto hide-scroll">
+            <button onclick="closeModals()" class="absolute top-4 right-4 text-textMuted hover:text-white">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+            <h3 class="text-xl font-bold text-white mb-6" id="comp-modal-title">Add Component</h3>
+            
+            <form id="component-form" class="space-y-4">
+                <input type="hidden" id="comp-id">
+                
+                <div>
+                    <label class="block text-sm font-medium text-textPrimary mb-1">Department</label>
+                    <input type="text" id="comp-department" placeholder="e.g., Electronics, Hardware" class="w-full bg-darkBg border border-borderColor rounded-md px-3 py-2 text-white focus:outline-none focus:border-accentOrange" required>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-textPrimary mb-1">Component Name</label>
+                    <input type="text" id="comp-name" class="w-full bg-darkBg border border-borderColor rounded-md px-3 py-2 text-white focus:outline-none focus:border-accentOrange" required>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-textPrimary mb-1">Current Stock</label>
+                        <input type="number" id="comp-stock" min="0" class="w-full bg-darkBg border border-borderColor rounded-md px-3 py-2 text-white focus:outline-none focus:border-accentOrange" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-textPrimary mb-1">Cost (₹)</label>
+                        <input type="number" id="comp-cost" min="0" step="0.01" class="w-full bg-darkBg border border-borderColor rounded-md px-3 py-2 text-white focus:outline-none focus:border-accentOrange" required>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-textPrimary mb-1">Min Order Quantity</label>
+                        <input type="number" id="comp-min" min="0" class="w-full bg-darkBg border border-borderColor rounded-md px-3 py-2 text-white focus:outline-none focus:border-accentOrange" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-textPrimary mb-1">Delivery Time (Days)</label>
+                        <input type="number" id="comp-delivery" min="0" class="w-full bg-darkBg border border-borderColor rounded-md px-3 py-2 text-white focus:outline-none focus:border-accentOrange" required>
+                    </div>
+                </div>
+                
+                <div class="pt-4 flex items-center justify-between border-t border-borderColor mt-6">
+                    <button type="button" id="comp-delete-btn" onclick="deleteComponent()" class="text-accentRed hover:text-red-400 text-sm font-medium hidden px-2 py-1 rounded bg-accentRed bg-opacity-10">
+                        <i class="fa-solid fa-trash mr-1"></i> Delete
+                    </button>
+                    <div class="flex space-x-3 ml-auto">
+                        <button type="button" onclick="closeModals()" class="px-4 py-2 border border-borderColor text-textPrimary rounded-md hover:bg-[#21262d] transition-colors">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-accentOrange hover:bg-[#c2591e] text-white rounded-md transition-colors font-medium">Save Details</button>
+                    </div>
+                </div>
+                
+                <div id="comp-order-section" class="hidden pt-4 mt-2 border-t border-borderColor">
+                    <label class="block text-sm font-bold text-accentBlue mb-2"><i class="fa-solid fa-truck-fast mr-2"></i>Order This Component Now</label>
+                    <div class="flex space-x-3">
+                        <input type="number" id="comp-order-qty" min="1" placeholder="Order Amount" class="flex-1 bg-darkBg border border-borderColor rounded-md px-3 py-2 text-white focus:outline-none focus:border-accentBlue">
+                        <button type="button" onclick="placeOrder()" class="px-4 py-2 bg-accentBlue hover:bg-blue-600 text-white rounded-md transition-colors font-medium shadow-sm">Place Order</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Active Order Modal -->
+    <div id="modal-edit-order" class="fixed inset-0 bg-black bg-opacity-70 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-borderColor rounded-xl p-6 w-full max-w-sm shadow-2xl relative">
+            <button onclick="closeModals()" class="absolute top-4 right-4 text-textMuted hover:text-white">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+            <h3 class="text-xl font-bold text-white mb-2">Edit Pending Order</h3>
+            <p class="text-textMuted text-sm mb-6" id="edit-order-comp-name">Component Name</p>
+            
+            <form id="edit-order-form" class="space-y-4">
+                <input type="hidden" id="edit-order-id">
+                <div>
+                    <label class="block text-sm font-medium text-textPrimary mb-1">Update Order Quantity</label>
+                    <input type="number" id="edit-order-qty" min="1" class="w-full bg-darkBg border border-borderColor rounded-md px-3 py-2 text-white focus:outline-none focus:border-accentOrange" required>
+                </div>
+                <div class="flex space-x-3 pt-2">
+                    <button type="button" onclick="closeModals()" class="flex-1 border border-borderColor text-textPrimary py-2 rounded-md hover:bg-[#21262d] transition-colors">Cancel</button>
+                    <button type="submit" class="flex-1 bg-accentOrange hover:bg-[#c2591e] text-white py-2 rounded-md font-medium transition-colors">Save Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // --- State Management ---
+        const COMP_KEY = 'epick_components_v9';
+        const ORDER_KEY = 'epick_orders_v9';
+        
+        let isAdmin = false; 
+        let components = [];
+        let activeOrders = [];
+
+        // --- Initialization ---
+        window.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('timeline-today').innerText = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            loadData();
+            updateAuthUI();
+        });
+
+        // --- LocalStorage Data Handling ---
+        function loadData() {
+            const storedComps = localStorage.getItem(COMP_KEY);
+            if (storedComps) {
+                components = JSON.parse(storedComps);
+            } else {
+                components = []; 
+                saveComponentsData();
+            }
+
+            const storedOrders = localStorage.getItem(ORDER_KEY);
+            if (storedOrders) {
+                activeOrders = JSON.parse(storedOrders);
+            } else {
+                activeOrders = [];
+                saveOrdersData();
+            }
+            
+            refreshViews();
+        }
+
+        function saveComponentsData() {
+            localStorage.setItem(COMP_KEY, JSON.stringify(components));
+            refreshViews();
+        }
+
+        function saveOrdersData() {
+            localStorage.setItem(ORDER_KEY, JSON.stringify(activeOrders));
+            refreshViews();
+        }
+
+        function refreshViews() {
+            renderDashboard();
+            renderComponentsTable();
+            renderOrdersTable();
+            renderProductionTable();
+        }
+
+        // --- Authentication Flow ---
+        function toggleAuth() {
+            if (isAdmin) {
+                isAdmin = false;
+                updateAuthUI();
+            } else {
+                document.getElementById('modal-login').classList.remove('hidden');
+                document.getElementById('login-error').classList.add('hidden');
+                document.getElementById('login-form').reset();
+            }
+        }
+
+        document.getElementById('login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = document.getElementById('login-id').value;
+            const pass = document.getElementById('login-password').value;
+            
+            if (id === 'Epick' && pass === 'Epick bike') {
+                isAdmin = true;
+                updateAuthUI();
+                closeModals();
+            } else {
+                document.getElementById('login-error').classList.remove('hidden');
+            }
+        });
+
+        function updateAuthUI() {
+            const authBtn = document.getElementById('auth-btn');
+            const authBtnText = document.getElementById('auth-btn-text');
+            const authIcon = document.getElementById('auth-icon');
+            const adminElements = document.querySelectorAll('.admin-only');
+
+            if (isAdmin) {
+                authBtnText.innerText = "Sign Out";
+                authIcon.className = "fa-solid fa-arrow-right-from-bracket";
+                authBtn.classList.add('text-accentRed');
+                authBtn.classList.remove('text-textPrimary');
+                adminElements.forEach(el => el.classList.remove('hidden'));
+            } else {
+                authBtnText.innerText = "Log In";
+                authIcon.className = "fa-solid fa-user-lock";
+                authBtn.classList.remove('text-accentRed');
+                authBtn.classList.add('text-textPrimary');
+                adminElements.forEach(el => el.classList.add('hidden'));
+            }
+            
+            renderComponentsTable();
+            renderOrdersTable();
+        }
+
+        // --- Logic & Calculations ---
+        function getComponentStatus(comp) {
+            const current = Number(comp.currentStock);
+            const min = Number(comp.minQty);
+            const threshold = min + Math.max(5, min * 0.2); 
+
+            if (current <= min) return 'order_now';
+            if (current <= threshold) return 'getting_low';
+            return 'stocked';
+        }
+
+        function formatDate(isoString) {
+            const d = new Date(isoString);
+            return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+
+        // --- View Rendering: Dashboard ---
+        function renderDashboard() {
+            let orderNow = 0, gettingLow = 0, stocked = 0, maxDeliveryOrderNow = 0;
+            const needsOrderItems = [];
+
+            components.forEach(comp => {
+                const status = getComponentStatus(comp);
+                if (status === 'order_now') {
+                    orderNow++;
+                    needsOrderItems.push(comp);
+                    if (Number(comp.deliveryTimeDays) > maxDeliveryOrderNow) {
+                        maxDeliveryOrderNow = Number(comp.deliveryTimeDays);
+                    }
+                } else if (status === 'getting_low') {
+                    gettingLow++;
+                } else {
+                    stocked++;
+                }
+            });
+
+            document.getElementById('stat-total').innerText = components.length;
+            document.getElementById('stat-order-now').innerText = orderNow;
+            document.getElementById('stat-getting-low').innerText = gettingLow;
+            document.getElementById('stat-stocked').innerText = stocked;
+            
+            document.getElementById('nav-active-orders-badge').innerText = activeOrders.length;
+            
+            const urgentCountEl = document.getElementById('dash-urgent-count');
+            urgentCountEl.innerText = orderNow;
+            urgentCountEl.className = orderNow > 0 ? 'text-5xl md:text-6xl font-bold text-accentRed' : 'text-5xl md:text-6xl font-bold text-accentTeal';
+
+            if (orderNow > 0) {
+                const landDate = new Date();
+                landDate.setDate(landDate.getDate() + maxDeliveryOrderNow);
+                document.getElementById('dash-longest-land').innerText = landDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                
+                const percent = Math.min(100, (maxDeliveryOrderNow / 45) * 100);
+                document.getElementById('timeline-progress').style.width = `${percent}%`;
+                document.getElementById('timeline-progress').className = 'h-full bg-accentRed rounded-full transition-all duration-1000';
+            } else {
+                document.getElementById('dash-longest-land').innerText = 'N/A';
+                document.getElementById('timeline-progress').style.width = '0%';
+                document.getElementById('timeline-progress').className = 'h-full bg-accentOrange rounded-full transition-all duration-1000';
+            }
+
+            const needsOrderContainer = document.getElementById('needs-order-list');
+            const needsOrderEmpty = document.getElementById('needs-order-empty');
+            
+            if (needsOrderItems.length > 0) {
+                needsOrderEmpty.classList.add('hidden');
+                needsOrderContainer.classList.remove('hidden');
+                needsOrderContainer.innerHTML = '';
+                
+                needsOrderItems.sort((a,b) => (a.currentStock/a.minQty) - (b.currentStock/b.minQty));
+
+                needsOrderItems.forEach(item => {
+                    const row = document.createElement('div');
+                    row.className = 'p-4 flex items-center justify-between hover:bg-[#1f242d] transition-colors';
+                    row.innerHTML = `
+                        <div class="flex items-center space-x-3">
+                            <div class="w-2 h-2 rounded-full bg-accentRed shadow-[0_0_8px_rgba(248,81,73,0.8)]"></div>
+                            <span class="font-medium text-white"><span class="text-textMuted font-normal">[${item.department || 'Unassigned'}]</span> ${item.name}</span>
+                        </div>
+                        <div class="text-sm text-textMuted flex space-x-6 items-center">
+                            <span>Stock: <strong class="text-accentRed text-base">${item.currentStock}</strong> / ${item.minQty}</span>
+                            <span class="hidden sm:inline-block bg-[#1f242d] px-2 py-1 rounded border border-borderColor"><i class="fa-solid fa-truck-fast mr-2"></i>${item.deliveryTimeDays} days</span>
+                        </div>
+                    `;
+                    needsOrderContainer.appendChild(row);
+                });
+            } else {
+                needsOrderEmpty.classList.remove('hidden');
+                needsOrderContainer.classList.add('hidden');
+            }
+        }
+
+        // --- View Rendering: Production Details ---
+        function renderProductionTable() {
+            const targetInput = document.getElementById('production-target').value;
+            const tbody = document.getElementById('production-table-body');
+            const tfoot = document.getElementById('production-table-foot');
+            
+            if (components.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center text-textMuted">No components available. Please add components first.</td></tr>`;
+                tfoot.classList.add('hidden');
+                return;
+            }
+
+            if (!targetInput || targetInput === "0") {
+                tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center text-textMuted">Enter the number of orders above to calculate requirements.</td></tr>`;
+                tfoot.classList.add('hidden');
+                return;
+            }
+
+            const targetOrders = Number(targetInput);
+            tbody.innerHTML = '';
+            let grandTotalCost = 0;
+            let itemsShown = 0; // Track how many items actually need ordering
+
+            components.forEach(comp => {
+                const stock = Number(comp.currentStock);
+                const moq = Number(comp.minQty);
+                const cost = Number(comp.cost);
+                const deliveryDays = Number(comp.deliveryTimeDays);
+
+                // Required = difference between Target Orders and Stock. 0 if we have enough stock.
+                const requiredQty = Math.max(0, targetOrders - stock);
+                
+                // NEW: Skip showing this component if we have enough stock to fulfill the order
+                if (requiredQty === 0) {
+                    return; 
+                }
+
+                itemsShown++;
+
+                // If we need to order, order the higher of MOQ or Required Qty.
+                const orderAmount = Math.max(moq, requiredQty);
+                const totalCost = orderAmount * cost;
+                
+                grandTotalCost += totalCost;
+
+                // Delivery Date Calculation
+                const delDate = new Date();
+                delDate.setDate(delDate.getDate() + deliveryDays);
+                const dateStr = formatDate(delDate.toISOString());
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-[#1f242d] transition-colors">
+                        <td class="px-6 py-4 font-medium text-white">${comp.name}</td>
+                        <td class="px-6 py-4 text-right">${stock}</td>
+                        <td class="px-6 py-4 text-right font-bold text-accentOrange">${requiredQty}</td>
+                        <td class="px-6 py-4 text-right text-textMuted">${moq}</td>
+                        <td class="px-6 py-4 text-right text-textMuted">₹${cost.toFixed(2)}</td>
+                        <td class="px-6 py-4 text-right font-bold text-accentRed">₹${totalCost.toFixed(2)}</td>
+                        <td class="px-6 py-4 text-right text-textMuted">${dateStr}</td>
+                    </tr>
+                `;
+            });
+
+            // If the loop finished and NO items were shown (because everything had enough stock)
+            if (itemsShown === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-12 text-center text-accentGreen font-medium text-lg"><i class="fa-solid fa-circle-check mr-2"></i>Sufficient stock available for all components. No orders required.</td></tr>`;
+                tfoot.classList.add('hidden');
+            } else {
+                tfoot.classList.remove('hidden');
+                tfoot.innerHTML = `
+                    <tr class="bg-[#21262d] font-bold text-white border-t border-borderColor">
+                        <td colspan="5" class="px-6 py-4 text-right">Grand Total Estimated Cost:</td>
+                        <td class="px-6 py-4 text-right text-accentRed text-lg">₹${grandTotalCost.toFixed(2)}</td>
+                        <td class="px-6 py-4"></td>
+                    </tr>
+                `;
+            }
+        }
+
+        // --- Components Tab ---
+        function renderComponentsTable() {
+            const container = document.getElementById('components-tables-container');
+            container.innerHTML = '';
+
+            const searchTerm = document.getElementById('search-input').value.toLowerCase().trim();
+            const filteredComps = components.filter(comp => {
+                const compName = comp.name.toLowerCase();
+                const compDept = (comp.department || 'Unassigned').toLowerCase();
+                return compName.includes(searchTerm) || compDept.includes(searchTerm);
+            });
+
+            if (filteredComps.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-cardBg border border-borderColor rounded-xl p-12 text-center shadow-sm">
+                        <i class="fa-solid fa-magnifying-glass text-4xl text-[#30363d] mb-4"></i>
+                        <p class="text-textMuted">No components match your search.</p>
+                    </div>`;
+                return;
+            }
+
+            const deptGroups = {};
+            filteredComps.forEach(comp => {
+                const dept = comp.department || 'Unassigned';
+                if (!deptGroups[dept]) deptGroups[dept] = [];
+                deptGroups[dept].push(comp);
+            });
+
+            Object.keys(deptGroups).sort().forEach(deptName => {
+                const deptComponents = deptGroups[deptName];
+                let tbodyHTML = '';
+                deptComponents.forEach(comp => {
+                    const status = getComponentStatus(comp);
+                    let statusBadge = '';
+                    let textClass = 'text-white';
+                    
+                    if (status === 'order_now') {
+                        statusBadge = `<span class="bg-accentRed bg-opacity-10 text-accentRed px-2 py-1 rounded text-xs font-bold border border-accentRed/20 uppercase tracking-wide">Order Now</span>`;
+                        textClass = 'text-accentRed font-bold';
+                    } else if (status === 'getting_low') {
+                        statusBadge = `<span class="bg-accentOrange bg-opacity-10 text-accentOrange px-2 py-1 rounded text-xs font-bold border border-accentOrange/20 uppercase tracking-wide">Getting Low</span>`;
+                        textClass = 'text-accentOrange font-medium';
+                    } else {
+                        statusBadge = `<span class="bg-accentTeal bg-opacity-10 text-accentTeal px-2 py-1 rounded text-xs font-bold border border-accentTeal/20 uppercase tracking-wide">Stocked</span>`;
+                    }
+
+                    const adminCellHtml = isAdmin ? `
+                        <td class="px-6 py-4 text-center admin-only">
+                            <button onclick="editComponent('${comp.id}')" class="text-textMuted hover:text-white transition-colors p-1 px-3 border border-borderColor rounded bg-darkBg shadow-sm text-xs font-medium uppercase" title="Edit">
+                                Edit
+                            </button>
+                        </td>` : `<td class="px-6 py-4 text-center admin-only hidden"></td>`;
+
+                    tbodyHTML += `
+                        <tr class="hover:bg-[#1f242d] transition-colors">
+                            <td class="px-6 py-4 font-medium text-white">${comp.name}</td>
+                            <td class="px-6 py-4">${statusBadge}</td>
+                            <td class="px-6 py-4 text-right ${textClass}">${comp.currentStock}</td>
+                            <td class="px-6 py-4 text-right text-textMuted">${comp.minQty}</td>
+                            <td class="px-6 py-4 text-right text-textMuted">₹${Number(comp.cost).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td class="px-6 py-4 text-right text-textMuted">${comp.deliveryTimeDays}d</td>
+                            ${adminCellHtml}
+                        </tr>
+                    `;
+                });
+
+                const adminHeaderHtml = isAdmin ? `<th class="px-6 py-4 font-semibold text-center admin-only">Actions</th>` : `<th class="px-6 py-4 font-semibold text-center admin-only hidden">Actions</th>`;
+
+                const tableHTML = `
+                    <div class="mb-6">
+                        <h3 class="text-xl font-bold text-accentBlue mb-3 px-1 border-b border-borderColor pb-2">${deptName}</h3>
+                        <div class="bg-cardBg border border-borderColor rounded-xl overflow-x-auto shadow-sm">
+                            <table class="w-full text-left text-sm whitespace-nowrap">
+                                <thead class="bg-[#1f242d] text-textMuted border-b border-borderColor">
+                                    <tr>
+                                        <th class="px-6 py-4 font-semibold">Component Name</th>
+                                        <th class="px-6 py-4 font-semibold">Status</th>
+                                        <th class="px-6 py-4 font-semibold text-right">Stock</th>
+                                        <th class="px-6 py-4 font-semibold text-right">Min Qty</th>
+                                        <th class="px-6 py-4 font-semibold text-right">Cost (₹)</th>
+                                        <th class="px-6 py-4 font-semibold text-right">Delivery</th>
+                                        ${adminHeaderHtml}
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-borderColor">
+                                    ${tbodyHTML}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', tableHTML);
+            });
+        }
+
+        // --- Orders Tab Rendering ---
+        function renderOrdersTable() {
+            const tbody = document.getElementById('orders-table-body');
+            tbody.innerHTML = '';
+
+            if (activeOrders.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-12 text-center text-textMuted">
+                    <i class="fa-solid fa-box-open text-4xl mb-3 block"></i> No active purchase orders.
+                </td></tr>`;
+                return;
+            }
+
+            activeOrders.sort((a,b) => new Date(a.expectedDate) - new Date(b.expectedDate));
+
+            activeOrders.forEach(order => {
+                const adminCellHtml = isAdmin ? `
+                    <td class="px-6 py-4 text-center admin-only space-x-2">
+                        <button onclick="openEditOrderModal('${order.id}')" class="text-textMuted hover:text-white transition-colors p-1 px-3 border border-borderColor rounded bg-darkBg text-xs font-medium uppercase" title="Edit Quantity">Edit</button>
+                        <button onclick="receiveOrder('${order.id}')" class="bg-accentGreen hover:bg-green-600 text-white transition-colors p-1 px-3 rounded shadow-sm text-xs font-medium uppercase border border-green-700" title="Mark Received & Add to Stock">Receive</button>
+                        <button onclick="cancelOrder('${order.id}')" class="text-accentRed hover:text-red-400 transition-colors p-1 px-2 text-xs font-medium uppercase" title="Cancel Order"><i class="fa-solid fa-trash"></i></button>
+                    </td>` : `<td class="px-6 py-4 text-center admin-only hidden"></td>`;
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-[#1f242d] transition-colors">
+                        <td class="px-6 py-4 font-medium text-white">
+                            <div class="text-xs text-textMuted">[${order.department}]</div>
+                            ${order.compName}
+                        </td>
+                        <td class="px-6 py-4 text-accentBlue font-bold">${order.qty}</td>
+                        <td class="px-6 py-4 text-textMuted">${formatDate(order.orderDate)}</td>
+                        <td class="px-6 py-4 text-accentOrange font-medium">${formatDate(order.expectedDate)}</td>
+                        ${adminCellHtml}
+                    </tr>
+                `;
+            });
+        }
+
+        // --- Components CRUD ---
+        window.openComponentModal = () => {
+            if (!isAdmin) return;
+            document.getElementById('component-form').reset();
+            document.getElementById('comp-id').value = '';
+            document.getElementById('comp-modal-title').innerText = 'Add Component';
+            document.getElementById('comp-delete-btn').classList.add('hidden');
+            
+            document.getElementById('comp-order-section').classList.add('hidden');
+            document.getElementById('modal-component').classList.remove('hidden');
+        };
+
+        window.editComponent = (id) => {
+            if (!isAdmin) return;
+            const comp = components.find(c => c.id === id);
+            if (!comp) return;
+
+            document.getElementById('comp-id').value = comp.id;
+            document.getElementById('comp-department').value = comp.department || '';
+            document.getElementById('comp-name').value = comp.name;
+            document.getElementById('comp-stock').value = comp.currentStock;
+            document.getElementById('comp-cost').value = comp.cost;
+            document.getElementById('comp-min').value = comp.minQty;
+            document.getElementById('comp-delivery').value = comp.deliveryTimeDays;
+            
+            document.getElementById('comp-modal-title').innerText = 'Edit Component';
+            document.getElementById('comp-delete-btn').classList.remove('hidden');
+            
+            document.getElementById('comp-order-qty').value = '';
+            document.getElementById('comp-order-section').classList.remove('hidden');
+            
+            document.getElementById('modal-component').classList.remove('hidden');
+        };
+
+        document.getElementById('component-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (!isAdmin) return;
+
+            const id = document.getElementById('comp-id').value;
+            const compData = {
+                department: document.getElementById('comp-department').value.trim(),
+                name: document.getElementById('comp-name').value.trim(),
+                currentStock: Number(document.getElementById('comp-stock').value),
+                cost: Number(document.getElementById('comp-cost').value),
+                minQty: Number(document.getElementById('comp-min').value),
+                deliveryTimeDays: Number(document.getElementById('comp-delivery').value)
+            };
+
+            if (id) {
+                const index = components.findIndex(c => c.id === id);
+                if (index !== -1) components[index] = { ...components[index], ...compData };
+            } else {
+                compData.id = Date.now().toString(); 
+                components.push(compData);
+            }
+
+            saveComponentsData();
+            closeModals();
+        });
+
+        window.deleteComponent = () => {
+            if (!isAdmin) return;
+            const id = document.getElementById('comp-id').value;
+            if (!id) return;
+            components = components.filter(c => c.id !== id);
+            saveComponentsData();
+            closeModals();
+        };
+
+        // --- ORDERING LOGIC ---
+        window.placeOrder = () => {
+            if (!isAdmin) return;
+            const compId = document.getElementById('comp-id').value;
+            const qty = Number(document.getElementById('comp-order-qty').value);
+            
+            if (!compId) {
+                alert("Please save the component first before ordering.");
+                return;
+            }
+            if (qty <= 0) {
+                alert("Please enter a valid order amount.");
+                return;
+            }
+
+            const comp = components.find(c => c.id === compId);
+            if (!comp) return;
+
+            const orderDate = new Date();
+            const expectedDate = new Date();
+            expectedDate.setDate(orderDate.getDate() + Number(comp.deliveryTimeDays));
+
+            const newOrder = {
+                id: Date.now().toString(),
+                compId: comp.id,
+                compName: comp.name,
+                department: comp.department || 'Unassigned',
+                qty: qty,
+                orderDate: orderDate.toISOString(),
+                expectedDate: expectedDate.toISOString()
+            };
+
+            activeOrders.push(newOrder);
+            saveOrdersData();
+            closeModals();
+            
+            document.getElementById('comp-order-qty').value = '';
+            switchView('orders');
+        };
+
+        window.openEditOrderModal = (orderId) => {
+            if(!isAdmin) return;
+            const order = activeOrders.find(o => o.id === orderId);
+            if(!order) return;
+            
+            document.getElementById('edit-order-id').value = order.id;
+            document.getElementById('edit-order-comp-name').innerText = `Updating: ${order.compName}`;
+            document.getElementById('edit-order-qty').value = order.qty;
+            
+            document.getElementById('modal-edit-order').classList.remove('hidden');
+        };
+
+        document.getElementById('edit-order-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            if(!isAdmin) return;
+            
+            const id = document.getElementById('edit-order-id').value;
+            const newQty = Number(document.getElementById('edit-order-qty').value);
+            
+            const index = activeOrders.findIndex(o => o.id === id);
+            if (index !== -1 && newQty > 0) {
+                activeOrders[index].qty = newQty;
+                saveOrdersData();
+            }
+            closeModals();
+        });
+
+        window.receiveOrder = (orderId) => {
+            if(!isAdmin) return;
+            const orderIndex = activeOrders.findIndex(o => o.id === orderId);
+            if(orderIndex === -1) return;
+            
+            const order = activeOrders[orderIndex];
+            
+            const compIndex = components.findIndex(c => c.id === order.compId);
+            if(compIndex !== -1) {
+                components[compIndex].currentStock += order.qty;
+                saveComponentsData();
+            }
+            
+            activeOrders.splice(orderIndex, 1);
+            saveOrdersData();
+        };
+
+        window.cancelOrder = (orderId) => {
+            if(!isAdmin) return;
+            if(confirm("Are you sure you want to cancel this order?")) {
+                activeOrders = activeOrders.filter(o => o.id !== orderId);
+                saveOrdersData();
+            }
+        };
+
+        // --- UI Utilities ---
+        window.closeModals = () => {
+            document.getElementById('modal-login').classList.add('hidden');
+            document.getElementById('modal-component').classList.add('hidden');
+            document.getElementById('modal-edit-order').classList.add('hidden');
+        };
+
+        window.switchView = (viewName) => {
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.classList.remove('active', 'bg-[#21262d]', 'text-white', 'font-semibold');
+                el.classList.add('text-textMuted');
+            });
+            const activeBtn = document.getElementById(`nav-${viewName}`);
+            if(activeBtn) {
+                activeBtn.classList.add('active', 'bg-[#21262d]', 'text-white', 'font-semibold');
+                activeBtn.classList.remove('text-textMuted');
+            }
+
+            ['dashboard', 'production', 'components', 'orders'].forEach(v => {
+                const view = document.getElementById(`view-${v}`);
+                if (view) view.classList.add('hidden');
+            });
+
+            const targetView = document.getElementById(`view-${viewName}`);
+            if (targetView) targetView.classList.remove('hidden');
+
+            if (window.innerWidth < 768) {
+                toggleMobileSidebar(false);
+            }
+            
+            if (viewName === 'production') {
+                renderProductionTable();
+            }
+        };
+
+        window.toggleMobileSidebar = (forceState = null) => {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            
+            let isOpen = !sidebar.classList.contains('-translate-x-full');
+            if (forceState !== null) isOpen = !forceState;
+
+            if (isOpen) {
+                sidebar.classList.add('-translate-x-full');
+                overlay.classList.add('hidden');
+            } else {
+                sidebar.classList.remove('-translate-x-full');
+                overlay.classList.remove('hidden');
+            }
+        };
+    </script>
+</body>
+</html>
